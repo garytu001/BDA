@@ -180,23 +180,38 @@ with r4_c1:
 
 with r4_c2:
     st.markdown("#### 語言模型趨勢評估")
-    api_key = st.text_input("輸入 Gemini API Key 啟用運算(我沒錢了)", type="password")
     
-    if api_key and st.button("執行模型分析"):
+    if st.button("執行模型分析 (AI 報告)"):
+        # 嘗試從 Streamlit 後台的保險箱讀取 API Key
+        try:
+            api_key = st.secrets["GEMINI_API_KEY"]
+        except Exception:
+            st.error("系統尚未設定 API 金鑰，請聯繫管理員。")
+            st.stop()
+            
         try:
             genai.configure(api_key=api_key)
             model = genai.GenerativeModel('gemini-2.5-flash')
             news_text = " ".join([n['title'] for n in news_list]) if news_list else "無最新新聞"
             
+            # 升級版的 Prompt：嚴格限制字數、要求數據佐證、並涵蓋專業報告三大面向
             prompt = f"""
-            基於以下客觀數據進行分析：
-            1. MSTR 當前溢價率為 {current_prem:.2%}。
-            2. 30日滾動相關係數為 {data['Corr'].iloc[-1]:.2f}。
-            3. 近期市場動態：{news_text}。
-            
-            請提供三點結構化的專業投資評估，語氣需客觀、理性。
+            身為專業量化分析師，請基於以下最新數據撰寫一份極簡市場報告：
+            1. MSTR 當前溢價率：{current_prem:.2%} (前日變動 {prem_change:+.2%})
+            2. 30日滾動相關係數：{data['Corr'].iloc[-1]:.2f}
+            3. MSTR 最新收盤價：${data["MSTR_Close"].iloc[-1]:.2f}
+            4. 近期市場動態：{news_text}
+
+            報告要求：
+            - 字數嚴格限制在 100 至 150 字之間。
+            - 必須包含具體數據引用，絕對不要空泛描述。
+            - 需涵蓋三項重點：(1) 溢價率趨勢與估值狀態評估 (2) 資產連動性(相關係數)帶來的風險或機會 (3) 結合新聞的短線展望。
+            - 語氣需客觀、理性、具備機構級報告的專業度。
             """
-            response = model.generate_content(prompt)
-            st.markdown(response.text)
+            
+            with st.spinner('正在彙整量化數據與新聞，生成專業報告中...'):
+                response = model.generate_content(prompt)
+                st.markdown(response.text)
+                
         except Exception as e:
             st.error(f"模型呼叫失敗，請確認 API 狀態。錯誤碼: {e}")
