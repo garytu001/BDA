@@ -178,40 +178,50 @@ with r4_c1:
     else:
         st.write("目前無最新相關新聞。")
 
-with r4_c2:
-    st.markdown("#### 語言模型趨勢評估")
-    
-    if st.button("執行模型分析 (AI 報告)"):
-        # 嘗試從 Streamlit 後台的保險箱讀取 API Key
-        try:
-            api_key = st.secrets["GEMINI_API_KEY"]
-        except Exception:
-            st.error("系統尚未設定 API 金鑰，請聯繫管理員。")
-            st.stop()
-            
-        try:
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-2.5-flash')
-            news_text = " ".join([n['title'] for n in news_list]) if news_list else "無最新新聞"
-            
-            # 升級版的 Prompt：嚴格限制字數、要求數據佐證、並涵蓋專業報告三大面向
-            prompt = f"""
-            身為專業量化分析師，請基於以下最新數據撰寫一份極簡市場報告：
-            1. MSTR 當前溢價率：{current_prem:.2%} (前日變動 {prem_change:+.2%})
-            2. 30日滾動相關係數：{data['Corr'].iloc[-1]:.2f}
-            3. MSTR 最新收盤價：${data["MSTR_Close"].iloc[-1]:.2f}
-            4. 近期市場動態：{news_text}
+# 定義一個具備「快取記憶」功能的 AI 函數
+@st.cache_data(ttl=3600) # 每一小時才重新生成一次，節省 API 額度
+def get_ai_report(api_key, prem, p_change, corr, close, news_txt):
+    try:
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        prompt = f"""
+        身為專業量化分析師，請針對以下數據撰寫極簡市場報告：
+        1. MSTR 當前溢價率：{prem:.2%} (前日變動 {p_change:+.2%})
+        2. 30日滾動相關係數：{corr:.2f}
+        3. MSTR 最新收盤價：${close:.2f}
+        4. 近期市場動態：{news_txt}
 
-            報告要求：
-            - 字數嚴格限制在 100 至 150 字之間。
-            - 必須包含具體數據引用，絕對不要空泛描述。
-            - 需涵蓋三項重點：(1) 溢價率趨勢與估值狀態評估 (2) 資產連動性(相關係數)帶來的風險或機會 (3) 結合新聞的短線展望。
-            - 語氣需客觀、理性、具備機構級報告的專業度。
-            """
+        報告要求：
+        - 字數嚴格限制在 100 至 150 字之間，分為三段。
+        - 必須包含具體數據引用，絕對不要空泛描述。
+        - 內容需涵蓋：估值評估、連動風險、短線展望。
+        - 語氣需極度客觀、理性，具備機構級報告專業感。
+        """
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        return f"模型分析暫時無法產生。錯誤訊息: {e}"
+
+with r4_c2:
+    st.markdown("#### 語言模型自動化趨勢報告")
+    
+    # 直接從 Secrets 拿 Key
+    try:
+        safe_key = st.secrets["GEMINI_API_KEY"]
+        news_summary = " ".join([n['title'] for n in news_list]) if news_list else "無最新新聞"
+        
+        # 這裡直接呼叫函數，不用按鈕，頁面一開就會跑
+        with st.spinner('AI 正在讀取即時量化數據...'):
+            report = get_ai_report(
+                safe_key, 
+                current_prem, 
+                prem_change, 
+                data['Corr'].iloc[-1], 
+                data["MSTR_Close"].iloc[-1], 
+                news_summary
+            )
+            st.info(report)
             
-            with st.spinner('正在彙整量化數據與新聞，生成專業報告中...'):
-                response = model.generate_content(prompt)
-                st.markdown(response.text)
-                
-        except Exception as e:
-            st.error(f"模型呼叫失敗，請確認 API 狀態。錯誤碼: {e}")
+    except Exception:
+        st.warning("請確保 Streamlit Secrets 中已設定 GEMINI_API_KEY。")
