@@ -183,7 +183,7 @@ with r4_c1:
 def get_ai_report(api_key, prem, p_change, corr, close, news_txt):
     try:
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         
         prompt = f"""
         身為專業量化分析師，請針對以下數據撰寫極簡市場報告：
