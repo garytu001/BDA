@@ -55,48 +55,6 @@ def get_extended_data():
     df['BTC_Volat'] = df['BTC_Ret'].rolling(20).std() * (252**0.5)
     
     return df
-Gemini 說了
-抓到兇手了！這是我的疏忽。
-
-剛剛在請你替換程式碼的時候，我提供的片段最後漏掉了一行極度關鍵的程式碼：raw_data = get_extended_data()。
-
-這導致系統雖然學會了「如何抓資料（定義函式）」，但卻忘記去執行它，所以在後面要用到 raw_data 畫圖的時候，系統找不到這個變數，就報了 NameError（找不到名稱）的錯誤。
-
-這真的只差最後一塊拼圖了，我們把它補上去：
-
-修復步驟（最後一次在 GitHub 上修改）
-回到 GitHub 編輯你的 app.py。
-
-找到 # --- 1. 資料獲取 --- 這個區塊的結尾（也就是 return df 的下一行）。
-
-確保 return df 和 # --- 2. 新聞獲取系統 --- 之間，有加上 raw_data = get_extended_data() 這一行。
-
-為了保證絕對不出錯，你可以直接把整個第一區塊替換成下面這樣：
-
-Python
-# --- 1. 資料獲取 ---
-@st.cache_data(ttl=3600)
-def get_extended_data():
-    mstr = yf.Ticker("MSTR").history(period="1y")
-    btc = yf.Ticker("BTC-USD").history(period="1y")
-    
-    mstr.index = pd.to_datetime(mstr.index).tz_localize(None).normalize()
-    btc.index = pd.to_datetime(btc.index).tz_localize(None).normalize()
-    
-    df = pd.concat([mstr['Close'], btc['Close'], mstr['Open'], mstr['High'], mstr['Low'], mstr['Volume'], btc['Volume']], axis=1, join='inner')
-    df.columns = ['MSTR_Close', 'BTC_Close', 'MSTR_Open', 'MSTR_High', 'MSTR_Low', 'MSTR_Vol', 'BTC_Vol']
-    
-    BTC_PER_SHARE = 0.00383
-    df['Premium'] = (df['MSTR_Close'] / (df['BTC_Close'] * BTC_PER_SHARE)) - 1
-    df['MSTR_BTC_Ratio'] = df['MSTR_Close'] / df['BTC_Close']
-    df['Corr'] = df['MSTR_Close'].rolling(30).corr(df['BTC_Close'])
-    df['MSTR_Ret'] = df['MSTR_Close'].pct_change()
-    df['BTC_Ret'] = df['BTC_Close'].pct_change()
-    df['MSTR_Volat'] = df['MSTR_Ret'].rolling(20).std() * (252**0.5)
-    df['BTC_Volat'] = df['BTC_Ret'].rolling(20).std() * (252**0.5)
-    
-    return df
-
 raw_data = get_extended_data() 
 # --- 2. 新聞獲取系統 ---
 @st.cache_data(ttl=1800)
