@@ -32,18 +32,12 @@ st.markdown("""
 
 st.title("MicroStrategy (MSTR) 量化指標與資產連動分析")
 
-# --- 1. 資料獲取 (加入突破 Yahoo 阻擋的偽裝機制) ---
+# --- 1. 資料獲取 ---
 @st.cache_data(ttl=3600)
 def get_extended_data():
-    # 建立一個 Session，並把自己偽裝成 Google Chrome 瀏覽器
-    session = requests.Session()
-    session.headers.update({
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    })
-    
-    # 抓取資料時帶入這個偽裝的 session
-    mstr = yf.Ticker("MSTR", session=session).history(period="1y")
-    btc = yf.Ticker("BTC-USD", session=session).history(period="1y")
+    # 移除手動 session，讓 yfinance 使用其內建的最新 curl_cffi 防阻擋機制
+    mstr = yf.Ticker("MSTR").history(period="1y")
+    btc = yf.Ticker("BTC-USD").history(period="1y")
     
     mstr.index = pd.to_datetime(mstr.index).tz_localize(None).normalize()
     btc.index = pd.to_datetime(btc.index).tz_localize(None).normalize()
@@ -61,9 +55,6 @@ def get_extended_data():
     df['BTC_Volat'] = df['BTC_Ret'].rolling(20).std() * (252**0.5)
     
     return df
-
-raw_data = get_extended_data()
-
 # --- 2. 新聞獲取系統 ---
 @st.cache_data(ttl=1800)
 def get_google_news(query="MicroStrategy 比特幣"):
