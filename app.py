@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import urllib.request
 import xml.etree.ElementTree as ET
 import urllib.parse
+import requests  # 新增 requests 模組用來設定偽裝
 
 # 系統與版面基礎設定
 st.set_page_config(page_title="DAT.co 量化分析終端", layout="wide", initial_sidebar_state="collapsed")
@@ -31,11 +32,18 @@ st.markdown("""
 
 st.title("MicroStrategy (MSTR) 量化指標與資產連動分析")
 
-# --- 1. 資料獲取 ---
+# --- 1. 資料獲取 (加入突破 Yahoo 阻擋的偽裝機制) ---
 @st.cache_data(ttl=3600)
 def get_extended_data():
-    mstr = yf.Ticker("MSTR").history(period="1y")
-    btc = yf.Ticker("BTC-USD").history(period="1y")
+    # 建立一個 Session，並把自己偽裝成 Google Chrome 瀏覽器
+    session = requests.Session()
+    session.headers.update({
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    })
+    
+    # 抓取資料時帶入這個偽裝的 session
+    mstr = yf.Ticker("MSTR", session=session).history(period="1y")
+    btc = yf.Ticker("BTC-USD", session=session).history(period="1y")
     
     mstr.index = pd.to_datetime(mstr.index).tz_localize(None).normalize()
     btc.index = pd.to_datetime(btc.index).tz_localize(None).normalize()
@@ -76,7 +84,6 @@ days_map = {"1個月": 30, "3個月": 90, "6個月": 180, "1年": 365}
 cutoff_date = datetime.now() - timedelta(days=days_map[timeframe])
 data = raw_data[raw_data.index >= pd.Timestamp(cutoff_date)]
 
-# 確保回撤率依照所選區間計算
 drawdown = (data['MSTR_Close'] / data['MSTR_Close'].cummax()) - 1
 
 # --- 4. 頂部核心數據卡片 ---
@@ -181,7 +188,7 @@ with r4_c1:
 
 with r4_c2:
     st.markdown("#### 語言模型趨勢評估")
-    api_key = st.text_input("輸入 Gemini API Key 啟用運算", type="password")
+    api_key = st.text_input("輸入 Gemini API Key 啟用運算(我沒錢了)", type="password")
     
     if api_key and st.button("執行模型分析"):
         try:
