@@ -185,7 +185,7 @@ with r4_c2:
     if api_key and st.button("執行模型分析"):
         try:
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-1.5-flash')
+            model = genai.GenerativeModel('gemini-2.5-flash')
             news_text = " ".join([n['title'] for n in news_list]) if news_list else "無最新新聞"
             
             prompt = f"""
